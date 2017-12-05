@@ -1,0 +1,9 @@
+**.zip
+**.npz
+**.dat
+**.pyc
+**.sgm
+**/__pycache__
+**/*log*
+checkpoints/
+.idea
