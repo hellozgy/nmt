@@ -66,7 +66,7 @@ def train(**kwargs):
     if os.path.exists(restore_file):
         print('restore parameters from {}'.format(restore_file))
         model_file = torch.load(restore_file)
-        model.load_state_dict(model_file['model'])
+        model.load_state_dict(model_file['model'], state_dict=False)
         checkpoint_id = int(model_file['checkpoint_id']) + 1
         best_score = float(model_file['score'])
     model.cuda(opt.ngpu)

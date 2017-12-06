@@ -16,38 +16,39 @@ def generate(**kwargs):
     dataset = AIDataset('valid', opt.max_len)
     opt.input_size = dataset.vocab_size_en
     opt.output_size = dataset.vocab_size_zh
-    model = getattr(models, opt.model)(opt)
-    restore_file = './checkpoints/{}/{}'.format(opt.model,
-                                                'checkpoint_last' if opt.restore_file is None else opt.restore_file)
-    print('restore parameters from {}'.format(restore_file))
-    model_file = torch.load(restore_file)
-    model.load_state_dict(model_file['model'])
+    models = []
+    for model_name, model_path in opt.restore_file:
+        model = getattr(models, opt.model)(opt)
+        model_file = './checkpoints/{}/{}'.format(model_name, model_path)
+        model_file = torch.load(model_file)
+        model.load_state_dict(model_file['model'], strict=False)
+        model.cuda(opt.ngpu)
+        model.eval()
+        models.append(model)
     dataloader = data.DataLoader(
         dataset=dataset,
         batch_size=opt.batch_size,
         shuffle=False, num_workers=1)
     fw = open('./data_valid/result_{}.txt'.format(opt.id), 'w', encoding='utf-8')
-    model.eval()
     for ii, (sentence_en,sentence_zh) in enumerate(dataloader):
         sentence_en = Variable(sentence_en, volatile=True).long().cuda(opt.ngpu)
-        predicts = model.translate_batch(sentence_en, opt.beam_size, opt.generate_max_len)
+        predicts = translate_batch(models, sentence_en, opt.beam_size, opt.generate_max_len)
         for i in range(len(predicts)):
             sentence = ''.join([dataset.index2word_zh[index] for index in predicts[i]])
             fw.write(sentence + '\n')
         fw.flush()
     fw.close()
-    model.train()
     score = float(mybleu(id))
     print('bleu:{}'.format(score))
 
 def translate_batch(models, inputs, beam_size, generate_max_len):
-    ngpu = models.get_device()
     n_model = len(models)
-    batch_size = models.size(0)
-    seq_len = models.size(1)
+    ngpu = inputs.get_device()
+    batch_size = inputs.size(0)
+    seq_len = inputs.size(1)
     for model in models:
-        model.beam_encode(inputs,beam_size)
-    sentence_en = models.repeat(1, beam_size).view(batch_size * beam_size, seq_len)
+        model.beam_encode(inputs, beam_size)
+    sentence_en = inputs.repeat(1, beam_size).view(batch_size * beam_size, seq_len)
     sentence_en_mask = torch.eq(sentence_en, Constants.PAD_INDEX)
     sentence_en_mask = sentence_en_mask.float().masked_fill_(sentence_en_mask, float('-inf'))
 
@@ -63,22 +64,23 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
         logprobs = 0
         Align = 0
         for n, model in enumerate(models):
-            logprob, At = model.beam_decoder(prev_y, sentence_en_mask)
+            logprob, At = model.beam_decode(prev_y, sentence_en_mask)
             Align += At
             logprobs += logprob
         logprobs = logprobs.view(n_remaining_sents, beam_size, -1).contiguous()
         active = []
         active_id = -1
-        re_idx = {}
+        re_idx = []
         for b in range(batch_size):
             if beam[b].done(): continue
             active_id += 1
             done, idx = beam[b].advance(logprobs.data[active_id] / n_model, Align / n_model)
             if not done:
                 active += [active_id]
-                re_idx[active_id] = idx
+                re_idx.append(idx * active_id)
 
         if len(active) == 0: break
+        re_idx = torch.cat(re_idx, 0)
         for model in models:
             model.update_state(re_idx)
         active_idx = torch.LongTensor([k for k in active])

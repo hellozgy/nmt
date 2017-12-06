@@ -108,6 +108,45 @@ class Translate_lstm(BasicModule):
                                                    inputs, target_sentence, target_len)
         return predicts, batch_loss
 
+    def beam_encode(self, inputs, beam_size=0):
+        '''
+        :param inputs: (batch_size, seq_len)
+        :param beam_size:
+        :return:
+        '''
+        batch_size = inputs.size(0)
+        seq_len = inputs.size(1)
+        ctx, hidden = self.encode(inputs)
+        self.ctx = ctx.repeat(1, 1, beam_size).view(seq_len, batch_size * beam_size, -1)
+        h_n = hidden[0].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hidden[0].size(-1))
+        c_n = hidden[1].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hidden[1].size(-1))
+        self.hidden = [h_n, c_n]
+        return ctx, hidden
+
+    def beam_decode(self, prev_y, mask):
+        '''
+        :param prev_y:(batch_size*beam_size, 1)
+        :param mask:(batch_size*beam_size, seq_len)
+        :return:
+        logprob:(batch_size*beam_size, output_size)
+        At:(batch_size*beam*size, seq_len)
+        '''
+        hidden = self.hidden
+        prev_y = self.embedding_zh(Variable(prev_y)).permute(1, 0, 2)
+        key = hidden[0][-1, :, :]
+        Ct, At = self.attention(self.ctx, key, mask)
+        input = torch.cat((Ct.unsqueeze(0), prev_y), 2)
+        output, hiddens = self.decoder(input, hidden)
+        output = self.fc(output[0])
+        logprob = self.adaptiveSoftmax.log_prob(output)
+        return logprob, At
+
+    def update_state(self, re_idx):
+        '''update hidden and ctx'''
+        self.ctx = self.ctx.index_select(1, re_idx)
+        self.hidden = self.hidden.index_select(1, re_idx)
+
+
     def translate_batch(self, sentence_en, beam_size=5, target_max_len=60, pr=1.1):
         #0.2177
         #0.2217

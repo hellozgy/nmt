@@ -95,7 +95,7 @@ class Beam(object):
         # End condition is when top-of-beam is EOS and no global score.
         if self.nextYs[-1][0] == Constants.EOS_INDEX:
             self.eosTop = True
-        return self.done()
+        return self.done(), prevK
 
     def done(self):
         return self.eosTop and len(self.finished) >= self.beam_size
