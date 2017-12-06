@@ -1,7 +1,7 @@
 import torch
 from dataset import Constants
+from torch.autograd import Variable
 import ipdb
-
 
 class Beam(object):
     # refer to OpenNMT
@@ -79,7 +79,7 @@ class Beam(object):
         # ipdb.set_trace()
         # self.hidden=[hidden[0].index_select(1, prevK), hidden[1].index_select(1, prevK)]
         self.nextYs.append((bestScoresId - prevK * numWords))
-        self.attn.append(attnOut.index_select(0, prevK))
+        self.attn.append(attnOut.index_select(0, Variable(prevK)))
 
         if self.globalScorer is not None:
             self.globalScorer.updateGlobalState(self)
@@ -92,6 +92,7 @@ class Beam(object):
                     s = globalScores
                 self.finished.append((s, len(self.nextYs) - 1, i))
 
+        ipdb.set_trace()
         # End condition is when top-of-beam is EOS and no global score.
         if self.nextYs[-1][0] == Constants.EOS_INDEX:
             self.eosTop = True
@@ -134,8 +135,8 @@ class GlobalScorer(object):
         self.alpha = alpha
         self.beta = beta
         self.src = src
-        sentence_en_mask = torch.eq(src, Constants.PAD_INDEX)
-        self.mask = sentence_en_mask.float().masked_fill_(sentence_en_mask, float('inf')).data
+        mask = torch.eq(src, Constants.PAD_INDEX).data
+        self.mask = mask.float().masked_fill_(mask, float('inf'))
 
 
     def score(self, beam, logprobs, i):
@@ -149,4 +150,4 @@ class GlobalScorer(object):
             beam.globalState["coverage"] = beam.attn[-1]
         else:
             beam.globalState["coverage"] = beam.globalState["coverage"] \
-                .index_select(0, beam.prevKs[-1]).add(beam.attn[-1])
+                .index_select(0, Variable(beam.prevKs[-1])).add(beam.attn[-1])

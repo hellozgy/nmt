@@ -7,24 +7,24 @@ from dataset import AIDataset
 from torch.utils import data
 from data_valid import mybleu
 from dataset import Constants
-from .modules import Beam,GlobalScorer
+from modules import Beam,GlobalScorer
 import ipdb
 
 def generate(**kwargs):
     opt.parse(kwargs)
-    opt.id = opt.model if opt.id is None else opt.id
+    assert opt.id is not None
     dataset = AIDataset('valid', opt.max_len)
     opt.input_size = dataset.vocab_size_en
     opt.output_size = dataset.vocab_size_zh
-    models = []
-    for model_name, model_path in opt.restore_file:
-        model = getattr(models, opt.model)(opt)
+    _models = []
+    for model_name, model_path in opt.restore_file.items():
+        model = getattr(models, model_name)(opt)
         model_file = './checkpoints/{}/{}'.format(model_name, model_path)
         model_file = torch.load(model_file)
         model.load_state_dict(model_file['model'], strict=False)
         model.cuda(opt.ngpu)
         model.eval()
-        models.append(model)
+        _models.append(model)
     dataloader = data.DataLoader(
         dataset=dataset,
         batch_size=opt.batch_size,
@@ -32,7 +32,7 @@ def generate(**kwargs):
     fw = open('./data_valid/result_{}.txt'.format(opt.id), 'w', encoding='utf-8')
     for ii, (sentence_en,sentence_zh) in enumerate(dataloader):
         sentence_en = Variable(sentence_en, volatile=True).long().cuda(opt.ngpu)
-        predicts = translate_batch(models, sentence_en, opt.beam_size, opt.generate_max_len)
+        predicts = translate_batch(_models, sentence_en, opt.beam_size, opt.generate_max_len)
         for i in range(len(predicts)):
             sentence = ''.join([dataset.index2word_zh[index] for index in predicts[i]])
             fw.write(sentence + '\n')
@@ -47,15 +47,16 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
     batch_size = inputs.size(0)
     seq_len = inputs.size(1)
     for model in models:
-        model.beam_encode(inputs, beam_size)
-    sentence_en = inputs.repeat(1, beam_size).view(batch_size * beam_size, seq_len)
-    sentence_en_mask = torch.eq(sentence_en, Constants.PAD_INDEX)
-    sentence_en_mask = sentence_en_mask.float().masked_fill_(sentence_en_mask, float('-inf'))
+        model.encode(inputs, beam_size)
+    inputs = inputs.repeat(1, beam_size).view(batch_size * beam_size, seq_len)
+    mask = torch.eq(inputs, Constants.PAD_INDEX).data
+    mask = mask.float().masked_fill_(mask, float('-inf'))
 
     n_remaining_sents = batch_size
     beam = [Beam(beam_size, ngpu,
-                 global_scorer=GlobalScorer(sentence_en[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
+                 global_scorer=GlobalScorer(inputs[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
 
+    length = 0
     for ii in range(generate_max_len):
         if all((b.done() for b in beam)):
             break
@@ -64,7 +65,7 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
         logprobs = 0
         Align = 0
         for n, model in enumerate(models):
-            logprob, At = model.beam_decode(prev_y, sentence_en_mask)
+            logprob, At, _ = model.decode_step(Variable(prev_y), mask, beam_search=True)
             Align += At
             logprobs += logprob
         logprobs = logprobs.view(n_remaining_sents, beam_size, -1).contiguous()
@@ -80,7 +81,7 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
                 re_idx.append(idx * active_id)
 
         if len(active) == 0: break
-        re_idx = torch.cat(re_idx, 0)
+        re_idx = Variable(torch.cat(re_idx, 0))
         for model in models:
             model.update_state(re_idx)
         active_idx = torch.LongTensor([k for k in active])
@@ -99,8 +100,10 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
             # ipdb.set_trace()
             return seq.view(n_remaining_sents, -1).index_select(0, active_idx).view(*new_size)
 
-        sentence_en_mask = update_active_seq2d(sentence_en_mask, active_idx)
+        mask = update_active_seq2d(mask, active_idx)
         n_remaining_sents = len(active)
+        length = ii
+    print('length:{}'.format(length))
 
     allHyps, allScores, allAttn = [], [], []
     for b in beam:
@@ -117,7 +120,10 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
     allHyps = [h[0] for h in allHyps]
     return allHyps
 
-
+'''
+python generate.py generate --batch_size 128 --ngpu=2 \
+--beam-size=1 --restore-file '{"Translate_lstm":"checkpoint112_score0.2377"}'
+'''
 
 if __name__=='__main__':
     import fire

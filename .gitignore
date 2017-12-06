@@ -4,6 +4,8 @@
 **.pyc
 **.sgm
 **/__pycache__
-**/*log*
+log/
 checkpoints/
 .idea
+data_valid/*
+!data_valid/**.py

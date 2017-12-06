@@ -4,13 +4,15 @@ class Config():
     model = None
     input_size = -1
     output_size = -1
+    Ls = 4
+    Lt = 4
     embeds_size = 512  # 词向量维度
     hidden_size = 1024  # 隐层维度
     max_len = 30  # 句长截断上限
     label_smooth = 0
     dropout = 0.
-    global_attn = False  # 全局attention
-    local_attn = True  # 局部attention
+    attn_general = True
+    attn_concat = False
     id = None
     eval_iter = 1000  # 评估模型
     batch_size = 128
@@ -19,7 +21,7 @@ class Config():
     lr = 1e-3
     limit_lr = 1e-6
     factor = 0.5 # 学习率调整速度
-    beam_size = 5
+    beam_size = 0
     alpha = 1
     beta = 0
     generate_max_len = 60  # 生成时最大句长

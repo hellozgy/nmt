@@ -67,14 +67,14 @@ class AdaptiveSoftmax(nn.Module):
         batch_size = head_out.size(0)
         prob = torch.zeros(batch_size, self.cutoff[-1]).cuda(input.get_device())
 
-        lsm_head = F.log_softmax(head_out)
+        lsm_head = F.log_softmax(head_out, -1)
         prob.narrow(1, 0, self.output_size).add_(lsm_head.narrow(1, 0, self.output_size).data)
         for i in range(len(self.tail)):
             pos = self.cutoff[i]
             i_size = self.cutoff[i + 1] - pos
             buffer = lsm_head.narrow(1, self.cutoff[0] + i, 1)
             buffer = buffer.expand(batch_size, i_size)
-            lsm_tail = F.log_softmax(self.tail[i](input))
+            lsm_tail = F.log_softmax(self.tail[i](input), -1)
             prob.narrow(1, pos, i_size).copy_(buffer.data).add_(lsm_tail.data)
 
         return Variable(prob)
