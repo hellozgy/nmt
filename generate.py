@@ -5,7 +5,9 @@ import torch
 from torch.autograd import Variable
 from dataset import AIDataset
 from torch.utils import data
-from data_valid import mybleu
+import sys
+sys.path.append('/users2/hpzhao/gyzhu/nmt/data_valid/tools/')
+from mt_score_main import mybleu
 from dataset import Constants
 from modules import Beam,GlobalScorer
 import ipdb
@@ -17,7 +19,7 @@ def generate(**kwargs):
     opt.input_size = dataset.vocab_size_en
     opt.output_size = dataset.vocab_size_zh
     _models = []
-    for model_name, model_path in opt.restore_file.items():
+    for model_name, model_path in opt.restore_file:
         model = getattr(models, model_name)(opt)
         model_file = './checkpoints/{}/{}'.format(model_name, model_path)
         model_file = torch.load(model_file)
@@ -38,6 +40,7 @@ def generate(**kwargs):
             fw.write(sentence + '\n')
         fw.flush()
     fw.close()
+    print('id:'+str(opt.id))
     score = float(mybleu(opt.id))
     print('bleu:{}'.format(score))
 
@@ -81,7 +84,6 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
             if beam[b].done(): continue
             active_id += 1
             done, idx = beam[b].advance(logprobs.data[active_id] / n_model, Align / n_model)
-
             if not done:
                 active += [active_id]
                 re_idx.append(idx + (active_id * beam_size))
@@ -91,13 +93,6 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
             model.update_state(re_idx)
         active_idx = torch.LongTensor([k for k in active])
         active_idx = active_idx.cuda(ngpu)
-
-        # batch_idx = {beam: idx for idx, beam in enumerate(active)}
-
-        def update_active_seq3d(seq, active_idx):
-            new_size = list(seq.size())
-            new_size[1] = len(active_idx) * beam_size
-            return seq.view(new_size[0], n_remaining_sents, -1).index_select(1, active_idx).view(*new_size)
 
         def update_active_seq2d(seq, active_idx):
             new_size = list(seq.size())
@@ -131,8 +126,9 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
     return allHyps
 
 '''
-python generate.py generate --batch_size 128 --ngpu=4 \
---beam-size=1 --restore-file '{"Translate_lstm":"checkpoint4_score0.1442"}'
+python generate.py generate --batch_size 256 --ngpu=7 --beam-size=2 \
+--restore-file '[("Translate_lstm","checkpoint6_score0.1744"), \
+("Translate_lstm","checkpoint5_score0.1625")]' --id 432
 '''
 
 if __name__=='__main__':
