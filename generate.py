@@ -38,15 +38,15 @@ def generate(**kwargs):
             fw.write(sentence + '\n')
         fw.flush()
     fw.close()
-    score = float(mybleu(id))
+    score = float(mybleu(opt.id))
     print('bleu:{}'.format(score))
 
-def translate_batch(models, inputs, beam_size, generate_max_len):
-    n_model = len(models)
+def translate_batch(_models, inputs, beam_size, generate_max_len):
+    n_model = len(_models)
     ngpu = inputs.get_device()
     batch_size = inputs.size(0)
     seq_len = inputs.size(1)
-    for model in models:
+    for model in _models:
         model.encode(inputs, beam_size)
     inputs = inputs.repeat(1, beam_size).view(batch_size * beam_size, seq_len)
     mask = torch.eq(inputs, Constants.PAD_INDEX).data
@@ -57,32 +57,37 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
                  global_scorer=GlobalScorer(inputs[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
 
     length = 0
+    # ipdb.set_trace()
     for ii in range(generate_max_len):
+        # if ii<=3:
+        #     ipdb.set_trace()
         if all((b.done() for b in beam)):
             break
         prev_y = torch.stack([
             b.getCurrentState() for b in beam if not b.done()]).view(-1, 1)
         logprobs = 0
         Align = 0
-        for n, model in enumerate(models):
-            logprob, At, _ = model.decode_step(Variable(prev_y), mask, beam_search=True)
+        for n, model in enumerate(_models):
+            logprob, At, _, _ = model.decode_step(Variable(prev_y), mask, beam_search=True)
             Align += At
             logprobs += logprob
         logprobs = logprobs.view(n_remaining_sents, beam_size, -1).contiguous()
         active = []
         active_id = -1
         re_idx = []
+        # if ii<=3:
+        #     ipdb.set_trace()
         for b in range(batch_size):
             if beam[b].done(): continue
             active_id += 1
             done, idx = beam[b].advance(logprobs.data[active_id] / n_model, Align / n_model)
+
             if not done:
                 active += [active_id]
-                re_idx.append(idx * active_id)
-
+                re_idx.append(idx + (active_id * beam_size))
         if len(active) == 0: break
         re_idx = Variable(torch.cat(re_idx, 0))
-        for model in models:
+        for model in _models:
             model.update_state(re_idx)
         active_idx = torch.LongTensor([k for k in active])
         active_idx = active_idx.cuda(ngpu)
@@ -104,7 +109,11 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
         n_remaining_sents = len(active)
         length = ii
     print('length:{}'.format(length))
+    for model in _models:
+        model.hiddens = None
+        model.ctx = None
 
+    # ipdb.set_trace()
     allHyps, allScores, allAttn = [], [], []
     for b in beam:
         scores, ks = b.sortFinished(beam_size)
@@ -117,12 +126,13 @@ def translate_batch(models, inputs, beam_size, generate_max_len):
         allScores.append(scores)
         allAttn.append(attn)
     # return allHyps, allScores, allAttn
+    # ipdb.set_trace()
     allHyps = [h[0] for h in allHyps]
     return allHyps
 
 '''
-python generate.py generate --batch_size 128 --ngpu=2 \
---beam-size=1 --restore-file '{"Translate_lstm":"checkpoint112_score0.2377"}'
+python generate.py generate --batch_size 128 --ngpu=4 \
+--beam-size=1 --restore-file '{"Translate_lstm":"checkpoint4_score0.1442"}'
 '''
 
 if __name__=='__main__':

@@ -92,7 +92,6 @@ class Beam(object):
                     s = globalScores
                 self.finished.append((s, len(self.nextYs) - 1, i))
 
-        ipdb.set_trace()
         # End condition is when top-of-beam is EOS and no global score.
         if self.nextYs[-1][0] == Constants.EOS_INDEX:
             self.eosTop = True

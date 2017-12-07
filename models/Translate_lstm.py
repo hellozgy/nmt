@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-
 from dataset import Constants
 from modules import *
 from .BasicModule import BasicModule
@@ -31,8 +30,6 @@ class Translate_lstm(BasicModule):
         cutoff = [3000, 20000, self.output_size]
         self.adaptiveSoftmax = AdaptiveSoftmax(self.embeds_size, cutoff=cutoff)
         self.loss_function = AdaptiveLoss(cutoff)
-
-        self.init_weight()
 
     def forward(self, inputs, targets=None, target_len=30):
         ctx, hiddens = self.encode(inputs)
@@ -67,9 +64,8 @@ class Translate_lstm(BasicModule):
         loss = 0
         mask = torch.eq(inputs, Constants.PAD_INDEX).data
         mask = mask.float().masked_fill_(mask, -float('inf'))
-
         for i in range(target_max_len):
-            _, At, output = self.decode_step(prev_y, mask, hiddens, ctx,  beam_search=False)
+            _, At, output, hiddens = self.decode_step(prev_y, mask, hiddens, ctx,  beam_search=False)
             aligns.append(At)
             target = targets[:, i].contiguous().view(-1)
             o = self.adaptiveSoftmax(output, target)
@@ -104,7 +100,8 @@ class Translate_lstm(BasicModule):
         output, hiddens = self.decoder(input, hiddens)
         output = self.fc(output[0])
         logprob = self.adaptiveSoftmax.log_prob(output) if beam_search else None
-        return logprob, At, output
+        if beam_search:self.hiddens = hiddens
+        return logprob, At, output, hiddens
 
     def update_state(self, re_idx):
         '''update hidden and ctx'''

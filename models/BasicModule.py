@@ -19,13 +19,8 @@ class BasicModule(nn.Module):
         self.dropout = opt.dropout
         self.label_smooth = opt.label_smooth
 
-        # self.attn_Wa = None
-        # self.attn_Va = None
         self.attn_fc = nn.Sequential(
             nn.Linear(2 * self.hidden_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
-            nn.Tanh(),
-            nn.Linear(self.hidden_size, self.hidden_size)
         )
 
     def init_weight(self):

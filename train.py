@@ -28,7 +28,6 @@ def eval(opt, model, best_score, checkpoint_id, epoch, batch):
     print('start eval')
     for sentence_en, sentence_zh in dataloader:
         step += 1
-        print(step)
         sentence_en = Variable(sentence_en, volatile=True).long().cuda(opt.ngpu)
         sentence_zh = Variable(sentence_zh, volatile=True).long().cuda(opt.ngpu)
         predicts, loss = model(sentence_en, sentence_zh, target_len=opt.max_len)
@@ -40,12 +39,10 @@ def eval(opt, model, best_score, checkpoint_id, epoch, batch):
                 index = predicts[j][i]
                 if index == Constants.EOS_INDEX: break
                 sentence += dataset.index2word_zh[index]
-            print(sentence)
             fw.write(sentence + '\n')
     fw.flush()
     fw.close()
     model.train()
-    print('start bleu')
     score = float(mybleu(opt.id))
     total_loss = total_loss / step
 

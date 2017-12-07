@@ -21,22 +21,11 @@ class Translate_lstm_resconn(BasicModule):
         self.decoder = nn.ModuleList([nn.LSTM(self.embeds_size + self.hidden_size, self.hidden_size)]+
                                      [nn.LSTM(self.hidden_size, self.hidden_size)]*(self.Lt-1))
 
-        self.pt = nn.Sequential(
-            nn.Linear(2*self.hidden_size, 256),
-            nn.Tanh(),
-            nn.Linear(256, 1),
-            nn.Sigmoid()
-        )
-        self.Wa = nn.Linear(self.hidden_size, self.hidden_size)
-        if self.global_attn and not self.local_attn:
-            self.pt = None
-            self.Wa = None
-        self.attn_fc = nn.Sequential(
-            nn.Linear(2*self.hidden_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
-            nn.Tanh(),
-            nn.Linear(self.hidden_size, self.hidden_size)
-        )
+        if self.attn_general:
+            self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, self.hidden_size))
+        elif self.attn_concat:
+            self.attn_Wa = nn.Parameter(torch.FloatTensor(2*self.hidden_size, self.hidden_size))
+            self.attn_Va = nn.Parameter(torch.FloatTensor(self.hidden_size, 1))
         self.fc = nn.Sequential(
             nn.Linear(self.hidden_size, self.embeds_size),
             nn.BatchNorm1d(self.embeds_size),
@@ -56,13 +45,11 @@ class Translate_lstm_resconn(BasicModule):
             if layer==0:continue
             output, hidden = lstm(input)
             hiddens.append(hidden)
-            if layer == 2:
-                input = (output + embeds) * math.sqrt(0.5)
-            elif layer > 2:
-                input = (input + output) * math.sqrt(0.5)
+            if layer > 2:
+                input = input + output
             else:
                 input = output
-        return (output + embeds) * math.sqrt(0.5), hiddens
+        return output, hiddens
 
     def attention(self, hs, ht, sentence_en_mask, ctx):
         '''
