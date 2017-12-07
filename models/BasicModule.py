@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+import random
+from dataset import Constants
 import ipdb
 
 
@@ -30,9 +32,44 @@ class BasicModule(nn.Module):
             else:
                 p.data.zero_()
 
-    def get_optimizer(self, lr=1e-3):
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        return optimizer
+    def forward(self, inputs, targets=None, target_len=30):
+        ctx, hiddens = self.encode(inputs)
+        predicts, batch_loss, aligns= self.decode(ctx, hiddens,
+                                                   inputs, targets, target_len)
+        return predicts, batch_loss
+
+    def encode(self, inputs, beam_size=0):
+        ctx, hiddens = self._encode(inputs)
+        if beam_size == 0:
+            return ctx, hiddens
+        else:
+            self.repeat_state(ctx, hiddens, beam_size)
+
+    def decode(self, ctx, hiddens, inputs, targets, target_max_len):
+        batch_size = inputs.size(0)
+        prev_y = Variable(inputs.data.new(batch_size, 1).zero_().long())
+        aligns = []
+        predicts = []
+        loss = 0
+        mask = torch.eq(inputs, Constants.PAD_INDEX).data
+        mask = mask.float().masked_fill_(mask, -float('inf'))
+        for i in range(target_max_len):
+            _, At, output, hiddens = self.decode_step(prev_y, mask, hiddens, ctx, beam_search=False)
+            aligns.append(At)
+            target = targets[:, i].contiguous().view(-1)
+            o = self.adaptiveSoftmax(output, target)
+            loss += self.loss_function(o, target)
+            if self.training:
+                if random.random() >= self.label_smooth:
+                    prev_y = targets[:, i].unsqueeze(1)
+                else:
+                    logprob = self.adaptiveSoftmax.log_prob(output)
+                    prev_y = logprob.topk(1, dim=1)[1]
+            else:
+                logprob = self.adaptiveSoftmax.log_prob(output)
+                prev_y = logprob.topk(1, dim=1)[1]
+                predicts.append(prev_y)
+        return predicts, loss/target_max_len, aligns
 
     def attention(self, ctx, key, mask):
         '''
@@ -59,4 +96,8 @@ class BasicModule(nn.Module):
         attn = torch.bmm(At, ctx)[:,0,:]  # (batch_size,1, hidden_size)
         attn = self.attn_fc(torch.cat([attn, residual], 1))
         return attn, At[:, 0, :]
+
+    def get_optimizer(self, lr=1e-3):
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        return optimizer
 

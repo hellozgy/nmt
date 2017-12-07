@@ -31,56 +31,16 @@ class Translate_lstm(BasicModule):
         self.adaptiveSoftmax = AdaptiveSoftmax(self.embeds_size, cutoff=cutoff)
         self.loss_function = AdaptiveLoss(cutoff)
 
-    def forward(self, inputs, targets=None, target_len=30):
-        ctx, hiddens = self.encode(inputs)
-        predicts, batch_loss, aligns = self.decode(ctx, hiddens,inputs, targets, target_len)
-        return predicts, batch_loss
-
-    def encode(self, inputs, beam_size=0):
+    def _encode(self, inputs):
         '''
         :param inputs: (batch_size, seq_len)
         :param beam_size:
         :return:
         '''
-        batch_size = inputs.size(0)
-        seq_len = inputs.size(1)
         inputs = self.embedding_en(inputs).permute(1, 0, 2)
         inputs = F.dropout(inputs, p=self.dropout, training=self.training)
         ctx, hiddens = self.encoder(inputs)
-        if beam_size == 0:
-            return ctx, hiddens
-        else:
-            self.ctx = ctx.repeat(1, 1, beam_size).view(seq_len, batch_size * beam_size, -1)
-            h_n = hiddens[0].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[0].size(-1))
-            c_n = hiddens[1].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[1].size(-1))
-            self.hiddens = [h_n, c_n]
-
-    def decode(self, ctx, hiddens, inputs, targets, target_max_len):
-        batch_size = inputs.size(0)
-        prev_y = Variable(inputs.data.new(batch_size, 1).zero_().long())
-        hiddens = hiddens
-        aligns = []
-        predicts = []
-        loss = 0
-        mask = torch.eq(inputs, Constants.PAD_INDEX).data
-        mask = mask.float().masked_fill_(mask, -float('inf'))
-        for i in range(target_max_len):
-            _, At, output, hiddens = self.decode_step(prev_y, mask, hiddens, ctx,  beam_search=False)
-            aligns.append(At)
-            target = targets[:, i].contiguous().view(-1)
-            o = self.adaptiveSoftmax(output, target)
-            loss += self.loss_function(o, target)
-            if self.training:
-                if random.random() >= self.label_smooth:
-                    prev_y = targets[:, i].unsqueeze(1)
-                else:
-                    logprob = self.adaptiveSoftmax.log_prob(output)
-                    prev_y = logprob.topk(1, dim=1)[1]
-            else:
-                logprob = self.adaptiveSoftmax.log_prob(output)
-                prev_y = logprob.topk(1, dim=1)[1]
-                predicts.append(prev_y)
-        return predicts, loss/target_max_len, aligns
+        return ctx, hiddens
 
     def decode_step(self, prev_y, mask, hiddens=None, ctx=None, beam_search=False):
         '''
@@ -109,3 +69,11 @@ class Translate_lstm(BasicModule):
         h_x = self.hiddens[0].index_select(1, re_idx)
         c_x = self.hiddens[1].index_select(1, re_idx)
         self.hiddens = [h_x, c_x]
+
+    def repeat_state(self, ctx, hiddens, beam_size):
+        seq_len = ctx.size(0)
+        batch_size = ctx.size(1)
+        self.ctx = ctx.repeat(1, 1, beam_size).view(seq_len, batch_size * beam_size, -1)
+        h_n = hiddens[0].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[0].size(-1))
+        c_n = hiddens[1].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[1].size(-1))
+        self.hiddens = [h_n, c_n]
