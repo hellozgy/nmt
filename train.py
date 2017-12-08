@@ -123,8 +123,8 @@ Dense Net
 
 activate
 cd $HOME/gyzhu/nmt
-python train.py train --ngpu=7 --eval_iter=500 --lr=0.001 \
---model=Translate_lstm --batch_size=256
+python train.py train --ngpu=2 --eval_iter=500 --lr=0.001 \
+--model=Translate_lstm_resconn --batch_size=256
 
 python main_wmt17.py eval --ngpu=7 --beam-size=1 \
 --model=Translate_lstm --batch_size=256 --restore_file checkpoint69_score0.2365

@@ -68,9 +68,9 @@ class Translate_lstm_resconn(BasicModule):
             output, hidden = lstm(input, hiddens[layer])
             hiddens[layer] = hidden
             if layer == 0:
-                input = ((Ct + prev_y).unsqueeze(0) + output) * math.sqrt(1 / 3)
+                input = Ct.unsqueeze(0) + output
             else:
-                input = (input + output) * math.sqrt(0.5)
+                input = input + output
         output = self.fc(output[0])
         logprob = self.adaptiveSoftmax.log_prob(output) if beam_search else None
         if beam_search:self.hiddens = hiddens

@@ -18,7 +18,7 @@ class Translate_lstm(BasicModule):
                                num_layers=self.Lt, bidirectional=False, dropout=self.dropout)
 
         if self.attn_general:
-            self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, self.hidden_size))
+            self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, 2*self.hidden_size))
         elif self.attn_concat:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(2*self.hidden_size, self.hidden_size))
             self.attn_Va = nn.Parameter(torch.FloatTensor(self.hidden_size, 1))
