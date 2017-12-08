@@ -5,16 +5,16 @@ from torch.autograd import Variable
 from dataset import Constants
 from modules import *
 import random
-import ipdb
 import  torch.nn.functional as F
 from .BasicModule import BasicModule
+import ipdb
 
-class Translate_lstm_wmt17(BasicModule):
+class Translate_gru_layernorm(BasicModule):
     '''
     实现wmt17爱丁堡大学的模型
     '''
     def __init__(self, opt):
-        super(Translate_lstm_wmt17, self).__init__(opt)
+        super(Translate_gru_layernorm, self).__init__(opt)
         vocab_size = max(self.input_size, self.output_size)
         self.encoder = nn.ModuleList([LNGRUCell(self.embeds_size, self.hidden_size) for _ in range(self.Ls)])
         self.encoder_reverse = nn.ModuleList([LNGRUCell(self.embeds_size, self.hidden_size) for _ in range(self.Ls)])

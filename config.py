@@ -22,8 +22,8 @@ class Config():
     limit_lr = 1e-6
     factor = 0.5 # 学习率调整速度
     beam_size = 0
-    alpha = 1
-    beta = 0
+    alpha = 1 # beam search长度惩罚
+    beta = 0 # attention覆盖惩罚
     generate_max_len = 60  # 生成时最大句长
     restore_file=None
 
