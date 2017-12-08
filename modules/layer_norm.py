@@ -17,13 +17,12 @@ class LayerNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x):
-        # mean = x.mean(-1, keepdim=True)
-        # std = ((x - mean).pow(2).mean(-1, keepdim=True) + self.eps).sqrt()
-        # if self.affine:
-        #     return ((x - mean) / std)*self.gamma + self.beta
-        # else:
-        #     return (x - mean) / std
-        return x
+        mean = x.mean(-1, keepdim=True)
+        std = 1 / (((x - mean).pow(2).mean(-1, keepdim=True) + self.eps).sqrt())
+        if self.affine:
+            return (x - mean) * std * self.gamma + self.beta
+        else:
+            return (x - mean)
 
 
 

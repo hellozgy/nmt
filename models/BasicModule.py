@@ -98,6 +98,6 @@ class BasicModule(nn.Module):
         return attn, At[:, 0, :]
 
     def get_optimizer(self, lr=1e-3):
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-5)
         return optimizer
 

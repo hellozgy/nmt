@@ -7,7 +7,7 @@ from modules import *
 import random
 import  torch.nn.functional as F
 from .BasicModule import BasicModule
-GRUCell = LNGRUCell
+GRUCell = nn.GRUCell
 import ipdb
 
 class Translate_gru_layernorm(BasicModule):
@@ -17,9 +17,8 @@ class Translate_gru_layernorm(BasicModule):
     def __init__(self, opt):
         super(Translate_gru_layernorm, self).__init__(opt)
         vocab_size = max(self.input_size, self.output_size)
-        self.encoder = Encoder(opt, vocab_size)
-        self.decoder = Decoder(opt, vocab_size, self.attention)
-        self.encoder.enc_emb.weight = self.decoder.dec_emb.weight
+        self.encoder = Encoder(opt, opt.input_size)
+        self.decoder = Decoder(opt, opt.output_size, self.attention)
 
         if self.attn_general:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, 2 * self.hidden_size))
