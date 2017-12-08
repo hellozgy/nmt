@@ -34,6 +34,13 @@ class Translate_gru_layernorm(BasicModule):
             nn.BatchNorm1d(self.hidden_size),
             nn.Tanh()
         )
+
+        self.fw = nn.Sequential(
+            nn.Linear(opt.hidden_size, opt.hidden_size),
+            nn.BatchNorm1d(opt.hidden_size),
+            nn.Tanh()
+        )
+
         cutoff = [3000, 20000, vocab_size]
         self.adaptiveSoftmax = AdaptiveSoftmax(self.hidden_size, cutoff=cutoff)
         self.loss_function = AdaptiveLoss(cutoff)
@@ -56,16 +63,11 @@ class Translate_gru_layernorm(BasicModule):
         '''
         hiddens = self.hiddens if beam_search else hiddens
         ctx = self.ctx if beam_search else ctx
-        prev_y = self.embedding_zh(prev_y).permute(1, 0, 2)
-        key = hiddens[0][-1, :, :]
-        Ct, At = self.attention(ctx, key, mask)
-        input = torch.cat((Ct.unsqueeze(0), prev_y), 2)
-        input = F.dropout(input, p=self.dropout, training=self.training)
-        output, hiddens = self.decoder(input, hiddens)
-        output = self.fc(output[0])
-        logprob = self.adaptiveSoftmax.log_prob(output) if beam_search else None
-        if beam_search: self.hiddens = hiddens
-        return logprob, At, output, hiddens
+        output, hiddens, At = self.decoder.forward_step(mask, ctx, prev_y, hiddens)
+        output = self.fw(output)
+        logprobs = self.adaptiveSoftmax.log_prob(output) if beam_search else None
+        if beam_search:self.hiddens = hiddens
+        return logprobs, At, output, hiddens
 
     def update_state(self, re_idx):
         '''update hidden and ctx'''
@@ -142,9 +144,9 @@ class Decoder(nn.Module):
         self.dropout = opt.dropout
         self.label_smooth = opt.label_smooth
         self.attn_func = attn_func
+        self.dec_emb = nn.Embedding(vocab_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
         self.decoder = nn.ModuleList([LNGRUCell(opt.embeds_size, opt.hidden_size)]+[LNGRUCell(2*opt.hidden_size, opt.hidden_size)]+
                                      [LNGRUCell(1, opt.hidden_size) for _ in range(opt.Lt - 2)])
-        self.dec_emb = nn.Embedding(vocab_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
         self.fw = nn.Sequential(
             nn.Linear(opt.hidden_size, opt.hidden_size),
             nn.BatchNorm1d(opt.hidden_size),
@@ -155,48 +157,22 @@ class Decoder(nn.Module):
         self.loss_function = AdaptiveLoss(cutoff)
 
 
-    def forward_step(self, mask, ctx, prev_y, hidden):
+    def forward_step(self, mask, ctx, prev_y, hiddens):
         '''
         :param ctx:编码阶段的上下文
         :param prev_y: 上个时间片的目标词向量
         :param hidden:上个时间片的隐层状态
-        :return:
+        :return:logprob, At, output, hiddens
         '''
         batch_size = mask.size(0)
         _input = Variable(ctx.data.new(batch_size, 1).zero_().float())
-        hidden = self.decoder[0](prev_y, hidden)
-        context,_ = self.attention(ctx, hidden, mask)
-        hidden = self.decoder[1](context, hidden)
+        prev_y = self.dec_emb(prev_y)[:, 0, :]
+        hiddens = self.decoder[0](prev_y, hiddens)
+        Ct, At = self.attn_func(ctx, hiddens, mask)
+        hiddens = self.decoder[1](Ct, hiddens)
         for index, rnn in enumerate(self.decoder):
             if index<2:continue
-            hidden = F.dropout(hidden, p=self.dropout, training=self.training)
-            hidden = rnn(_input, hidden)
-        return hidden
+            hiddens = F.dropout(hiddens, p=self.dropout, training=self.training)
+            hiddens = rnn(_input, hiddens)
 
-    def forward(self, ctx, hidden, inputs, targets, target_len):
-        batch_size = ctx.size(1)
-        prev_y = Variable(ctx.data.new(batch_size, self.embeds_size).zero_().float())
-        predicts = []
-        loss = 0
-
-        mask = torch.eq(inputs, Constants.PAD_INDEX)
-        mask = mask.float().masked_fill_(mask, float('-inf'))
-        for i in range(target_len):
-            hidden = self.forward_step(mask, ctx, prev_y, hidden, self.dropout)
-            y = self.fw(hidden)
-            target = targets[:, i].contiguous().view(-1)
-            o = self.adaptiveSoftmax(y, target)
-            loss += self.loss_function(o, target)
-            if self.training:
-                if self.label_smooth > 0 and random.random() < self.label_smooth:
-                    predict = self.adaptiveSoftmax.log_prob(y)
-                    y = predict.topk(1, dim=1)[1]
-                else:
-                    y = targets[:, i].unsqueeze(1)
-            else:
-                predict = self.adaptiveSoftmax.log_prob(y)
-                predict = predict.topk(1, dim=1)[1]
-                predicts.append(predict)
-                y = predict
-            prev_y = self.dec_emb(y)[:, 0, :]
-        return predicts, loss / target_len
+        return hiddens, hiddens, At
