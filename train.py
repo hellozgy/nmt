@@ -103,7 +103,6 @@ def train(**kwargs):
             torch.nn.utils.clip_grad_norm(model.parameters(), 1)
             optimizer.step()
             loss += batch_loss.data[0]
-            print(batch_loss.data[0])
             if batch % 100 == 0:
                 print('{}:loss:{}'.format(batch, loss / batch))
 
