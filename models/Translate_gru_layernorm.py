@@ -7,6 +7,7 @@ from modules import *
 import random
 import  torch.nn.functional as F
 from .BasicModule import BasicModule
+GRUCell = LNGRUCell
 import ipdb
 
 class Translate_gru_layernorm(BasicModule):
@@ -21,10 +22,16 @@ class Translate_gru_layernorm(BasicModule):
         self.encoder.enc_emb.weight = self.decoder.dec_emb.weight
 
         if self.attn_general:
-            self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, self.hidden_size))
+            self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, 2 * self.hidden_size))
+            nn.init.xavier_normal(self.attn_Wa)
         elif self.attn_concat:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(3*self.hidden_size, self.hidden_size))
             self.attn_Va = nn.Parameter(torch.FloatTensor(self.hidden_size, 1))
+            nn.init.xavier_normal(self.attn_Wa)
+            nn.init.xavier_normal(self.attn_Va)
+        self.attn_fc = nn.Sequential(
+            nn.Linear(3 * self.hidden_size, self.hidden_size),
+        )
 
         self.fw = nn.Sequential(
             nn.Linear(opt.hidden_size, opt.hidden_size),
@@ -58,17 +65,13 @@ class Translate_gru_layernorm(BasicModule):
     def update_state(self, re_idx):
         '''update hidden and ctx'''
         self.ctx = self.ctx.index_select(1, re_idx)
-        h_x = self.hiddens[0].index_select(1, re_idx)
-        c_x = self.hiddens[1].index_select(1, re_idx)
-        self.hiddens = [h_x, c_x]
+        self.hiddens = self.hiddens.index_select(1, re_idx)
 
     def repeat_state(self, ctx, hiddens, beam_size):
         seq_len = ctx.size(0)
         batch_size = ctx.size(1)
         self.ctx = ctx.repeat(1, 1, beam_size).view(seq_len, batch_size * beam_size, -1)
-        h_n = hiddens[0].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[0].size(-1))
-        c_n = hiddens[1].repeat(1, 1, beam_size).view(-1, batch_size * beam_size, hiddens[1].size(-1))
-        self.hiddens = [h_n, c_n]
+        self.hiddens = self.hiddens.repeat(1, beam_size).view(batch_size * beam_size, self.hiddens.size(1))
 
 
 class Encoder(nn.Module):
@@ -77,10 +80,10 @@ class Encoder(nn.Module):
         self.hidden_size = opt.hidden_size
         self.dropout = opt.dropout
         self.enc_emb = nn.Embedding(vocab_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
-        self.encoder = nn.ModuleList([LNGRUCell(opt.embeds_size, opt.hidden_size)]+
-                                     [LNGRUCell(1, opt.hidden_size)]*(opt.Ls - 1))
-        self.encoder_reverse = nn.ModuleList([LNGRUCell(opt.embeds_size, opt.hidden_size)]+
-                                             [LNGRUCell(1, opt.hidden_size)]*(opt.Ls - 1))
+        self.encoder = nn.ModuleList([GRUCell(opt.embeds_size, opt.hidden_size)]+
+                                     [GRUCell(1, opt.hidden_size)]*(opt.Ls - 1))
+        self.encoder_reverse = nn.ModuleList([GRUCell(opt.embeds_size, opt.hidden_size)]+
+                                             [GRUCell(1, opt.hidden_size)]*(opt.Ls - 1))
         self.ln = nn.ModuleList([LayerNorm(self.hidden_size)]*(opt.Ls - 1))
         self.ln_reverse = nn.ModuleList([LayerNorm(self.hidden_size)]*(opt.Ls - 1))
 
@@ -120,7 +123,7 @@ class Encoder(nn.Module):
         outputs = torch.stack(outputs)
         outputs_reverse.reverse()
         outputs_reverse = torch.stack(outputs_reverse)
-        ctx = torch.cat([outputs, outputs_reverse],-1)
+        ctx = torch.cat([outputs, outputs_reverse], -1)
         return ctx, hidden
 
 class Decoder(nn.Module):
@@ -129,8 +132,8 @@ class Decoder(nn.Module):
         self.dropout = opt.dropout
         self.attn_func = attn_func
         self.dec_emb = nn.Embedding(vocab_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
-        self.decoder = nn.ModuleList([LNGRUCell(opt.embeds_size, opt.hidden_size)]+[LNGRUCell(2*opt.hidden_size, opt.hidden_size)]+
-                                     [LNGRUCell(1, opt.hidden_size) for _ in range(opt.Lt - 2)])
+        self.decoder = nn.ModuleList([GRUCell(opt.embeds_size, opt.hidden_size)]+[GRUCell(opt.hidden_size, opt.hidden_size)]+
+                                     [GRUCell(1, opt.hidden_size) for _ in range(opt.Lt - 2)])
 
 
     def forward_step(self, mask, ctx, prev_y, hiddens):
@@ -150,5 +153,4 @@ class Decoder(nn.Module):
             if index<2:continue
             hiddens = F.dropout(hiddens, p=self.dropout, training=self.training)
             hiddens = rnn(_input, hiddens)
-
         return hiddens, hiddens, At

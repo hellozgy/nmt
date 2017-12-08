@@ -17,12 +17,13 @@ class LayerNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x):
-        mean = x.mean(-1, keepdim=True)
-        std = ((x - mean).pow(2).sum(-1, keepdim=True).div(x.size(-1)) + self.eps).sqrt()
-        if self.affine:
-            return self.gamma * (x - mean) / std + self.beta
-        else:
-            return (x - mean) / std
+        # mean = x.mean(-1, keepdim=True)
+        # std = ((x - mean).pow(2).mean(-1, keepdim=True) + self.eps).sqrt()
+        # if self.affine:
+        #     return ((x - mean) / std)*self.gamma + self.beta
+        # else:
+        #     return (x - mean) / std
+        return x
 
 
 
@@ -33,7 +34,7 @@ class LNGRUCell(nn.Module):
         super(LNGRUCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        # 为了提升速度，这里实现跟原论文有不同
+        # 为了提升速度，这里将4个layer_horm合并成2个
         self.W = nn.Parameter(torch.FloatTensor(input_size, 3*hidden_size))
         self.U = nn.Parameter(torch.FloatTensor(hidden_size, 3*hidden_size))
         self.W_ln = LayerNorm(3*hidden_size, affine=affine)
@@ -43,7 +44,7 @@ class LNGRUCell(nn.Module):
 
     def reset_parameters(self):
         nn.init.xavier_normal(self.W)
-        nn.init.orthogonal(self.U)
+        nn.init.xavier_normal(self.U)
 
     def forward(self, input, hx):
         assert input.dim()==2 and hx.dim()==2

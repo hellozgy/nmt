@@ -50,7 +50,7 @@ def eval(opt, model, best_score, checkpoint_id, epoch, batch):
     print(msg)
     with open('./log/{}.txt'.format(opt.id), 'a', encoding='utf-8') as fw:
         fw.write(msg + '\n')
-    torch.save({'model': model.state_dict(), 'checkpoint_id': checkpoint_id, 'score': score},
+    torch.save({'model': model.state_dict(), 'checkpoint_id': checkpoint_id, 'score': score, 'opt':opt},
                './checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score))
     shutil.copy('./checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score),
                 './checkpoints/{}/checkpoint_last'.format(opt.id))
@@ -79,6 +79,8 @@ def train(**kwargs):
     if os.path.exists(restore_file):
         print('restore parameters from {}'.format(restore_file))
         model_file = torch.load(restore_file)
+        if 'opt' in model_file: opt.parseopt(model_file['opt'])
+        model = getattr(models, opt.model)(opt)
         model.load_state_dict(model_file['model'], strict=False)
         checkpoint_id = int(model_file['checkpoint_id']) + 1
         best_score = float(model_file['score'])
@@ -98,9 +100,10 @@ def train(**kwargs):
             optimizer.zero_grad()
             _, batch_loss = model(sentence_en, sentence_zh, target_len=opt.max_len)
             batch_loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), 0.1)
+            torch.nn.utils.clip_grad_norm(model.parameters(), 1)
             optimizer.step()
             loss += batch_loss.data[0]
+            print(batch_loss.data[0])
             if batch % 100 == 0:
                 print('{}:loss:{}'.format(batch, loss / batch))
 

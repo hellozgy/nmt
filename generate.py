@@ -9,7 +9,7 @@ import sys
 sys.path.append('/users2/hpzhao/gyzhu/nmt/data_valid/tools/')
 from mt_score_main import mybleu
 from dataset import Constants
-from modules import Beam,GlobalScorer
+from modules import Beam, GlobalScorer
 import ipdb
 
 def generate(**kwargs):
@@ -20,9 +20,10 @@ def generate(**kwargs):
     opt.output_size = dataset.vocab_size_zh
     _models = []
     for model_name, model_path in opt.restore_file:
-        model = getattr(models, model_name)(opt)
         model_file = './checkpoints/{}/{}'.format(model_name, model_path)
         model_file = torch.load(model_file)
+        if 'opt' in model_file: opt.parseopt(model_file['opt'])
+        model = getattr(models, model_name)(opt)
         model.load_state_dict(model_file['model'], strict=False)
         model.cuda(opt.ngpu)
         model.eval()
@@ -39,9 +40,10 @@ def generate(**kwargs):
             sentence = ''.join([dataset.index2word_zh[index] for index in predicts[i]])
             fw.write(sentence + '\n')
         fw.flush()
+    fw.flush()
     fw.close()
     print('id:'+str(opt.id))
-    score = float(mybleu(opt.id))
+    score = float(mybleu(str(opt.id)))
     print('bleu:{}'.format(score))
 
 def translate_batch(_models, inputs, beam_size, generate_max_len):
