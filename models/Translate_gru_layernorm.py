@@ -16,24 +16,15 @@ class Translate_gru_layernorm(BasicModule):
     def __init__(self, opt):
         super(Translate_gru_layernorm, self).__init__(opt)
         vocab_size = max(self.input_size, self.output_size)
-        self.encoder = nn.ModuleList([LNGRUCell(self.embeds_size, self.hidden_size) for _ in range(self.Ls)])
-        self.encoder_reverse = nn.ModuleList([LNGRUCell(self.embeds_size, self.hidden_size) for _ in range(self.Ls)])
-        self.enc_emb = nn.Embedding(vocab_size, self.embeds_size, padding_idx=Constants.PAD_INDEX)
-        self.linear = nn.Linear(2 * self.hidden_size, self.hidden_size)
+        self.encoder = Encoder(opt, vocab_size)
+        self.decoder = Decoder(opt, vocab_size, self.attention)
+        self.encoder.enc_emb.weight = self.decoder.dec_emb.weight
 
-        self.decoder = nn.ModuleList([LNGRUCell(self.embeds_size, self.hidden_size)] + [LNGRUCell(2 * self.hidden_size, self.hidden_size)] +
-                                     [LNGRUCell(1, self.hidden_size) for _ in range(self.Lt - 2)])
-        self.dec_emb = nn.Embedding(vocab_size, self.embeds_size, padding_idx=Constants.PAD_INDEX)
         if self.attn_general:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, self.hidden_size))
         elif self.attn_concat:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(3*self.hidden_size, self.hidden_size))
             self.attn_Va = nn.Parameter(torch.FloatTensor(self.hidden_size, 1))
-        self.fw = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
-            nn.Tanh()
-        )
 
         self.fw = nn.Sequential(
             nn.Linear(opt.hidden_size, opt.hidden_size),
@@ -44,11 +35,6 @@ class Translate_gru_layernorm(BasicModule):
         cutoff = [3000, 20000, vocab_size]
         self.adaptiveSoftmax = AdaptiveSoftmax(self.hidden_size, cutoff=cutoff)
         self.loss_function = AdaptiveLoss(cutoff)
-
-        self.encoder = Encoder(opt, vocab_size)
-        self.decoder = Decoder(opt, vocab_size, self.attention)
-        self.encoder.enc_emb.weight = self.decoder.dec_emb.weight
-
 
     def _encode(self, inputs):
         return self.encoder(inputs)
@@ -140,21 +126,11 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, opt, vocab_size, attn_func):
         super(Decoder, self).__init__()
-        self.hidden_size = opt.hidden_size
         self.dropout = opt.dropout
-        self.label_smooth = opt.label_smooth
         self.attn_func = attn_func
         self.dec_emb = nn.Embedding(vocab_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
         self.decoder = nn.ModuleList([LNGRUCell(opt.embeds_size, opt.hidden_size)]+[LNGRUCell(2*opt.hidden_size, opt.hidden_size)]+
                                      [LNGRUCell(1, opt.hidden_size) for _ in range(opt.Lt - 2)])
-        self.fw = nn.Sequential(
-            nn.Linear(opt.hidden_size, opt.hidden_size),
-            nn.BatchNorm1d(opt.hidden_size),
-            nn.Tanh()
-        )
-        cutoff = [3000, 20000, vocab_size]
-        self.adaptiveSoftmax = AdaptiveSoftmax(opt.hidden_size, cutoff=cutoff)
-        self.loss_function = AdaptiveLoss(cutoff)
 
 
     def forward_step(self, mask, ctx, prev_y, hiddens):
