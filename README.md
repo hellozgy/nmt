@@ -5,7 +5,6 @@
 ## train
 	python train.py train --ngpu=2 --eval_iter=10000 --lr=0.001 --model=Translate_lstm --batch_size=128
  	python train.py train --ngpu=2 --eval_iter=10000 --lr=0.001 --model=Translate_lstm_resconn --batch_size=128
-	python train.py train --ngpu=2 --eval_iter=10000 --lr=0.001 --model=Translate_gru_layernorm --batch_size=128 --embeds_size 1024 --hidden_size=1024 --Ls=4 --Lt=8
 
 ---
 ## generate
