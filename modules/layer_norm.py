@@ -36,14 +36,17 @@ class LNGRUCell(nn.Module):
         # 为了提升速度，这里将4个layer_horm合并成2个
         self.W = nn.Parameter(torch.FloatTensor(input_size, 3*hidden_size))
         self.U = nn.Parameter(torch.FloatTensor(hidden_size, 3*hidden_size))
+        self.b = nn.Parameter(torch.zeros(3*hidden_size))
         self.W_ln = LayerNorm(3*hidden_size, affine=affine)
         self.U_ln = LayerNorm(3*hidden_size, affine=affine)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        nn.init.xavier_normal(self.W)
-        nn.init.xavier_normal(self.U)
+        weight_data = torch.eye(self.hidden_size)
+        weight_data = weight_data.repeat(1, 3)
+        self.W.data.set_(weight_data)
+        self.U.data.set_(weight_data)
 
     def forward(self, input, hx):
         assert input.dim()==2 and hx.dim()==2
@@ -57,9 +60,9 @@ class LNGRUCell(nn.Module):
         xw = torch.split(xw, self.hidden_size, -1)
         hu = torch.split(hu, self.hidden_size, -1)
 
-        z = F.sigmoid(xw[0] + hu[0])
-        r = F.sigmoid(xw[1] + hu[1])
-        hx_ = F.tanh(r * hu[2] + xw[2])
+        z = F.sigmoid(xw[0] + hu[0] + self.b[:self.hidden_size])
+        r = F.sigmoid(xw[1] + hu[1] + self.b[self.hidden_size:2*self.hidden_size])
+        hx_ = F.tanh(r * hu[2] + xw[2] + self.b[2*self.hidden_size:])
         hx = (1 - z) * hx_ + z * hx
         return hx
 

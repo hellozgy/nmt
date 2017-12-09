@@ -110,34 +110,6 @@ def train(**kwargs):
                 best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
         best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
 
-
-'''
-想法：
-解码的时候每个先生成一个单词(初始化为0或者使用rnn解码，后续步骤作为后处理），然后每层叠加的时候再优化这些单词，这样可以使用对后面单词的attention
-还可以跟R2L模型结合
-attention 时减去前面累计的attention
-给循环网络后面的句子添加更大的loss权重
-把句子按照句号问好感叹号省略号切分开
-merge 词组
-skip connection
-fuse gate
-Dense Net
-
-activate
-cd $HOME/gyzhu/nmt
-python train.py train --ngpu=2 --eval_iter=500 --lr=0.001 \
---model=Translate_lstm_resconn --batch_size=256
-
-python main_wmt17.py eval --ngpu=7 --beam-size=1 \
---model=Translate_lstm --batch_size=256 --restore_file checkpoint69_score0.2365
-技术要点：
-使用bpe数据预处理
-bi-lstm+attention
-adaptive softmax
-beam search
-t2s和r2l来后处理
-'''
-
 if __name__=='__main__':
     import fire
     fire.Fire()

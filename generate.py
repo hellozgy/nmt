@@ -62,10 +62,7 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
                  global_scorer=GlobalScorer(inputs[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
 
     length = 0
-    # ipdb.set_trace()
     for ii in range(generate_max_len):
-        # if ii<=3:
-        #     ipdb.set_trace()
         if all((b.done() for b in beam)):
             break
         prev_y = torch.stack([
@@ -80,8 +77,6 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
         active = []
         active_id = -1
         re_idx = []
-        # if ii<=3:
-        #     ipdb.set_trace()
         for b in range(batch_size):
             if beam[b].done(): continue
             active_id += 1
@@ -99,7 +94,6 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
         def update_active_seq2d(seq, active_idx):
             new_size = list(seq.size())
             new_size[0] = len(active_idx) * beam_size
-            # ipdb.set_trace()
             return seq.view(n_remaining_sents, -1).index_select(0, active_idx).view(*new_size)
 
         mask = update_active_seq2d(mask, active_idx)
@@ -110,7 +104,6 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
         model.hiddens = None
         model.ctx = None
 
-    # ipdb.set_trace()
     allHyps, allScores, allAttn = [], [], []
     for b in beam:
         scores, ks = b.sortFinished(beam_size)
@@ -122,16 +115,8 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
         allHyps.append(hyps)
         allScores.append(scores)
         allAttn.append(attn)
-    # return allHyps, allScores, allAttn
-    # ipdb.set_trace()
     allHyps = [h[0] for h in allHyps]
     return allHyps
-
-'''
-python generate.py generate --batch_size 256 --ngpu=7 --beam-size=2 \
---restore-file '[("Translate_lstm","checkpoint6_score0.1744"), \
-("Translate_lstm","checkpoint5_score0.1625")]' --id 432
-'''
 
 if __name__=='__main__':
     import fire

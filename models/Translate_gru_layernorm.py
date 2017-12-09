@@ -123,6 +123,7 @@ class Encoder(nn.Module):
         outputs_reverse.reverse()
         outputs_reverse = torch.stack(outputs_reverse)
         ctx = torch.cat([outputs, outputs_reverse], -1)
+        hidden = torch.mean(outputs, 0)
         return ctx, hidden
 
 class Decoder(nn.Module):
