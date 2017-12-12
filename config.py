@@ -26,6 +26,7 @@ class Config():
     beta = 0 # attention覆盖惩罚
     generate_max_len = 60  # 生成时最大句长
     restore_file=None
+    save=True
 
     def parse(self, args):
         for k, v in args.items():

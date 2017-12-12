@@ -40,6 +40,7 @@ def eval(opt, model, best_score, checkpoint_id, epoch, batch):
                 if index == Constants.EOS_INDEX: break
                 sentence += dataset.index2word_zh[index]
             fw.write(sentence + '\n')
+        fw.flush()
     fw.flush()
     fw.close()
     model.train()
@@ -50,14 +51,15 @@ def eval(opt, model, best_score, checkpoint_id, epoch, batch):
     print(msg)
     with open('./log/{}.txt'.format(opt.id), 'a', encoding='utf-8') as fw:
         fw.write(msg + '\n')
-    torch.save({'model': model.state_dict(), 'checkpoint_id': checkpoint_id, 'score': score, 'opt':opt},
-               './checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score))
-    shutil.copy('./checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score),
-                './checkpoints/{}/checkpoint_last'.format(opt.id))
-    if score > best_score:
-        best_score = score
-        shutil.copy('./checkpoints/{}/checkpoint_last'.format(opt.id),
-                    './checkpoints/{}/checkpoint_best'.format(opt.id))
+    if opt.save:
+        torch.save({'model': model.state_dict(), 'checkpoint_id': checkpoint_id, 'score': score, 'opt':opt},
+                   './checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score))
+        shutil.copy('./checkpoints/{}/checkpoint{}_score{}'.format(opt.id, checkpoint_id, score),
+                    './checkpoints/{}/checkpoint_last'.format(opt.id))
+        if score > best_score:
+            best_score = score
+            shutil.copy('./checkpoints/{}/checkpoint_last'.format(opt.id),
+                        './checkpoints/{}/checkpoint_best'.format(opt.id))
     return best_score, checkpoint_id + 1
 
 def train(**kwargs):
