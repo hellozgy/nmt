@@ -65,11 +65,13 @@ class Sogou(BasicModule):
         seq_len = ctx.size(0)
         batch_size = ctx.size(1)
         self.ctx = ctx.repeat(1, 1, beam_size).view(seq_len, batch_size * beam_size, -1)
-        for layer in range(len(self.hiddnes)):
-            hidden = self.hiddens[layer]
+
+        for layer in range(len(hiddens)):
+            hidden = hiddens[layer]
             hx = hidden[0].repeat(1, beam_size).view(batch_size * beam_size, hidden[0].size(1))
             cx = hidden[1].repeat(1, beam_size).view(batch_size * beam_size, hidden[1].size(1))
-            self.hiddens[layer] = (hx, cx)
+            hiddens[layer] = (hx, cx)
+        self.hiddens = hiddens
 
 class Encoder(nn.Module):
     def __init__(self, opt):

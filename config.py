@@ -41,7 +41,7 @@ class Config():
 
     def parseopt(self, opt):
         keys = [k for k in dir(opt) if not k.startswith('_') and not k.startswith('parse')
-                and not k.startswith('show')]
+                and not k.startswith('show') and k not in set(['ngpu', 'id', 'beam_size', 'alpha', 'beta', 'restore_file'])]
         for key in keys:
             setattr(self, key, getattr(opt, key))
 

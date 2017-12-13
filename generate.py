@@ -20,6 +20,7 @@ def generate(**kwargs):
     opt.output_size = dataset.vocab_size_zh
     _models = []
     for model_name, model_path in opt.restore_file:
+        print(model_name)
         model_file = './checkpoints/{}/{}'.format(model_name, model_path)
         model_file = torch.load(model_file)
         if 'opt' in model_file: opt.parseopt(model_file['opt'])
