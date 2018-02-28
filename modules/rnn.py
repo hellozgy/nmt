@@ -58,11 +58,11 @@ class LNGRU(nn.Module):
         self.num_layers = num_layers
         self.bidirectory = bidirectory
         self.ff_gru = nn.ModuleList([GRU(input_size, hidden_size, bias, affine)] +
-                                    [GRU(hidden_size, hidden_size, bias, affine)] * (num_layers-1))
+                                    [GRU(hidden_size, hidden_size, bias, affine) for _ in range(num_layers-1)])
         self.back_gru = None
         if bidirectory:
             self.back_gru = nn.ModuleList([GRU(input_size, hidden_size, bias, affine)] +
-                                          [GRU(hidden_size, hidden_size, bias, affine)] * (num_layers-1))
+                                          [GRU(hidden_size, hidden_size, bias, affine) for _ in range(num_layers-1)])
         self.dropout = dropout
 
     def forward(self, input, h0=None):
