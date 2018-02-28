@@ -66,7 +66,7 @@ def train(**kwargs):
     opt.parse(kwargs)
     opt.id = opt.model if opt.id is None else opt.id
     save2path = './checkpoints/{}/'.format(opt.id)
-    if  not os.path.exists(save2path):os.system('mkdir {}'.format(save2path))
+    if  not os.path.exists(save2path): os.system('mkdir {}'.format(save2path))
     assert opt.ngpu >= 0
     dataset_train = AIDataset('train', opt.max_len)
     opt.input_size = dataset_train.vocab_size_en

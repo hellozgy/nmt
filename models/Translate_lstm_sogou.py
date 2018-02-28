@@ -101,9 +101,9 @@ class Decoder(nn.Module):
         self.attn_func = attn_func
         self.dec_emb = nn.Embedding(opt.output_size, opt.embeds_size, padding_idx=Constants.PAD_INDEX)
         self.decoder = nn.ModuleList([nn.LSTMCell(opt.embeds_size, opt.hidden_size)]+
-                                  [nn.LSTMCell(opt.hidden_size, opt.hidden_size)]*2+
+                                  [nn.LSTMCell(opt.hidden_size, opt.hidden_size) for _ in range(2)]+
                                   [cLSTMCell(opt.embeds_size, opt.hidden_size, opt.hidden_size)])
-        self.ln = nn.ModuleList([LayerNorm(opt.hidden_size)]*3)
+        self.ln = nn.ModuleList([LayerNorm(opt.hidden_size) for _ in range(3)])
 
     def forward_step(self, mask, ctx, prev_y, hiddens):
         prev_embeds = self.dec_emb(prev_y)[:,0,:]

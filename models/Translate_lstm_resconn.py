@@ -17,9 +17,9 @@ class Translate_lstm_resconn(BasicModule):
         self.embedding_zh = nn.Embedding(self.output_size, self.embeds_size, padding_idx=Constants.PAD_INDEX)
         self.encoder = nn.ModuleList([nn.LSTM(self.embeds_size, self.hidden_size, bidirectional=True)]+
                                      [nn.LSTM(2*self.hidden_size, self.hidden_size)]+
-                                     [nn.LSTM(self.hidden_size, self.hidden_size)]*(self.Ls-1))
+                                     [nn.LSTM(self.hidden_size, self.hidden_size) for _ in range(self.Ls-1)])
         self.decoder = nn.ModuleList([nn.LSTM(self.embeds_size + self.hidden_size, self.hidden_size)]+
-                                     [nn.LSTM(self.hidden_size, self.hidden_size)]*(self.Lt-1))
+                                     [nn.LSTM(self.hidden_size, self.hidden_size) for _ in range(self.Lt-1)])
 
         if self.attn_general:
             self.attn_Wa = nn.Parameter(torch.FloatTensor(self.hidden_size, self.hidden_size))
