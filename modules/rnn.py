@@ -21,13 +21,6 @@ class LNGRUCell(nn.Module):
         self.W_ln = LayerNorm(3*hidden_size, affine=affine)
         self.U_ln = LayerNorm(3*hidden_size, affine=affine)
 
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        weight_data = torch.eye(self.hidden_size)
-        weight_data = weight_data.repeat(1, 3)
-        self.W.data.set_(weight_data)
-        self.U.data.set_(weight_data)
 
     def forward(self, input, hx):
         assert input.dim()==2 and hx.dim()==2
