@@ -21,6 +21,12 @@ class LNGRUCell(nn.Module):
         self.W_ln = LayerNorm(3*hidden_size, affine=affine)
         self.U_ln = LayerNorm(3*hidden_size, affine=affine)
 
+        self.reset()
+
+    def reset(self):
+        torch.nn.init.xavier_normal(self.W)
+        torch.nn.init.xavier_normal(self.U)
+
 
     def forward(self, input, hx):
         assert input.dim()==2 and hx.dim()==2
@@ -44,16 +50,16 @@ class LNGRU(nn.Module):
     '''
     使用参见标准GRU
     '''
-    def __init__(self, GRU, input_size, hidden_size, num_layers=1, bidirectory=False, bias=True, affine=True, dropout=0):
+    def __init__(self, GRU, input_size, hidden_size, num_layers=1, bidirectional=False, bias=True, affine=True, dropout=0):
         super(LNGRU, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.bidirectory = bidirectory
+        self.bidirectional = bidirectional
         self.ff_gru = nn.ModuleList([GRU(input_size, hidden_size, bias, affine)] +
                                     [GRU(hidden_size, hidden_size, bias, affine) for _ in range(num_layers-1)])
         self.back_gru = None
-        if bidirectory:
+        if bidirectional:
             self.back_gru = nn.ModuleList([GRU(input_size, hidden_size, bias, affine)] +
                                           [GRU(hidden_size, hidden_size, bias, affine) for _ in range(num_layers-1)])
         self.dropout = dropout
@@ -61,18 +67,18 @@ class LNGRU(nn.Module):
     def forward(self, input, h0=None):
         assert input.dim() == 3, input.size()
         if h0 is None:
-            h0 = Variable(input.data.new(self.num_layers * (2 if self.bidirectory else 1),
+            h0 = Variable(input.data.new(self.num_layers * (2 if self.bidirectional else 1),
                                 input.size(1), self.hidden_size).zero_().float())
         assert h0.dim() == 3
         assert input.size(2) == self.input_size and h0.size(2) == self.hidden_size, 'input:{},h0:{}'.format(str(input.size()), str(h0.size()))
         assert input.size(1) == h0.size(1)
-        assert h0.size(0) == self.num_layers * (2 if self.bidirectory else 1)
+        assert h0.size(0) == self.num_layers * (2 if self.bidirectional else 1)
         hiddens = []
         input_ff = [input[i] for i in range(input.size(0))]
         input_back = [input[i] for i in range(input.size(0))]
         seq_len = input.size(0)
         for layer in range(self.num_layers):
-            hidden = h0[layer*(2 if self.bidirectory else 1),:,:]
+            hidden = h0[layer*(2 if self.bidirectional else 1),:,:]
             output_ff = []
             for timestep in range(seq_len):
                 x = input_ff[timestep]
@@ -81,8 +87,8 @@ class LNGRU(nn.Module):
             input_ff = output_ff
             hiddens.append(hidden)
 
-            if self.bidirectory:
-                hidden = h0[1 + layer * (2 if self.bidirectory else 1), :, :]
+            if self.bidirectional:
+                hidden = h0[1 + layer * (2 if self.bidirectional else 1), :, :]
                 output_back = []
                 for timestep in range(seq_len-1, -1, -1):
                     x = input_back[timestep]
@@ -94,7 +100,7 @@ class LNGRU(nn.Module):
 
         hiddens = torch.stack(hiddens)
         output = torch.stack(input_ff)
-        if self.bidirectory:
+        if self.bidirectional:
             output = torch.cat([output, torch.stack(input_back)], 2)
         return output, hiddens
 
