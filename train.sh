@@ -1,1 +1,1 @@
-python train.py train --ngpu=1 --eval_iter=10000 --lr=0.001 --model=Translate_lstm_resconn --batch_size=128 --embeds_size=256 --hidden_size=256 --id=label_smooth
+python train.py train --ngpu=1 --eval_iter=10000 --lr=0.001 --model=Translate_lstm_resconn --batch_size=512 --embeds_size=256 --hidden_size=256 --id=label_smooth

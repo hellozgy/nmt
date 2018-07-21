@@ -111,13 +111,13 @@ class AdaptiveLoss(nn.Module):
         return new_target
 
     def label_smooth(self, inputs, targets):
-        label_smooth = 0.1
+        label_smooth = [0.02, 0.05, 0.1]
 
         for i in range(len(targets)):
             if inputs[i] is None:continue
             true_dist = inputs[i].data.clone()
-            true_dist.fill_(label_smooth / (len(true_dist[0])-2))
-            true_dist.scatter_(1, targets[i].data.unsqueeze(1), 1-label_smooth)
+            true_dist.fill_(label_smooth[i] / (len(true_dist[0])-2))
+            true_dist.scatter_(1, targets[i].data.unsqueeze(1), 1-label_smooth[i])
             true_dist[:, Constants.PAD_INDEX] = 0
             if i == 0:
                 mask = torch.nonzero(targets[i].data==Constants.PAD_INDEX)
