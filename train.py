@@ -108,8 +108,8 @@ def train(**kwargs):
             if batch % 100 == 0:
                 print('{}:loss:{}'.format(batch, loss / batch))
 
-            if batch % opt.eval_iter == 0:
-                best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
+            # if batch % opt.eval_iter == 0:
+            #     best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
         best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
 
 if __name__=='__main__':
