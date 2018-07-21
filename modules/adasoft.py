@@ -88,7 +88,7 @@ class AdaptiveLoss(nn.Module):
         self.criterions = nn.ModuleList()
         
         for i in self.cutoff:
-            self.criterions.append(nn.KLDivLoss())
+            self.criterions.append(nn.KLDivLoss(size_average=False))
             # self.criterions.append(nn.CrossEntropyLoss(size_average=False, ignore_index=Constants.PAD_INDEX))
 
             
