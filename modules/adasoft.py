@@ -81,15 +81,18 @@ class AdaptiveSoftmax(nn.Module):
 
 
 class AdaptiveLoss(nn.Module):
-    def __init__(self, cutoff):
+    def __init__(self, cutoff, label_smooth):
         super().__init__()
         
         self.cutoff = cutoff
         self.criterions = nn.ModuleList()
+        self.label_smooth = label_smooth
         
-        for i in self.cutoff:
-            self.criterions.append(nn.KLDivLoss(size_average=False))
-            # self.criterions.append(nn.CrossEntropyLoss(size_average=False, ignore_index=Constants.PAD_INDEX))
+        for _ in self.cutoff:
+            if self.label_smooth>0:
+                self.criterions.append(nn.KLDivLoss(size_average=False))
+            else:
+                self.criterions.append(nn.CrossEntropyLoss(size_average=False, ignore_index=Constants.PAD_INDEX))
 
             
     def remap_target(self, target): 
@@ -110,8 +113,8 @@ class AdaptiveLoss(nn.Module):
                 
         return new_target
 
-    def label_smooth(self, inputs, targets):
-        label_smooth = [0.02, 0.05, 0.1]
+    def adjust_target_label_smooth(self, inputs, targets):
+        label_smooth = [self.label_smooth/8, self.label_smooth/4, self.label_smooth]
 
         for i in range(len(targets)):
             if inputs[i] is None:continue
@@ -135,7 +138,8 @@ class AdaptiveLoss(nn.Module):
         '''
         batch_size = input[0].size(0)
         target = self.remap_target(target.data)
-        target = self.label_smooth(input, target)
+        if self.label_smooth>0:
+            target = self.adjust_target_label_smooth(input, target)
         output = 0.0
     
         for i in range(len(input)):

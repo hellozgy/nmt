@@ -36,7 +36,7 @@ class Translate_lstm_resconn(BasicModule):
         )
         cutoff = [3000, 20000, self.output_size]
         self.adaptiveSoftmax = AdaptiveSoftmax(self.embeds_size, cutoff=cutoff)
-        self.loss_function = AdaptiveLoss(cutoff)
+        self.loss_function = AdaptiveLoss(cutoff, opt.label_smooth)
 
     def _encode(self, inputs):
         embeds = self.embedding_en(inputs).permute(1, 0, 2)
