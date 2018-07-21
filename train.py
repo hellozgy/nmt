@@ -76,16 +76,16 @@ def train(**kwargs):
     model = getattr(models, opt.model)(opt)
     best_score = 0.
     checkpoint_id = 1
-    restore_file = './checkpoints/{}/{}'.format(opt.model,
-                    'checkpoint_last' if opt.restore_file is None else opt.restore_file)
-    if os.path.exists(restore_file):
-        print('restore parameters from {}'.format(restore_file))
-        model_file = torch.load(restore_file)
-        if 'opt' in model_file: opt.parseopt(model_file['opt'])
-        model = getattr(models, opt.model)(opt)
-        model.load_state_dict(model_file['model'], strict=False)
-        checkpoint_id = int(model_file['checkpoint_id']) + 1
-        best_score = float(model_file['score'])
+    # restore_file = './checkpoints/{}/{}'.format(opt.model,
+    #                 'checkpoint_last' if opt.restore_file is None else opt.restore_file)
+    # if os.path.exists(restore_file):
+    #     print('restore parameters from {}'.format(restore_file))
+    #     model_file = torch.load(restore_file)
+    #     if 'opt' in model_file: opt.parseopt(model_file['opt'])
+    #     model = getattr(models, opt.model)(opt)
+    #     model.load_state_dict(model_file['model'], strict=False)
+    #     checkpoint_id = int(model_file['checkpoint_id']) + 1
+    #     best_score = float(model_file['score'])
     model.cuda(opt.ngpu)
 
     optimizer = model.get_optimizer(opt.lr)
@@ -102,14 +102,14 @@ def train(**kwargs):
             optimizer.zero_grad()
             _, batch_loss = model(sentence_en, sentence_zh, target_len=opt.max_len)
             batch_loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), 1)
+            torch.nn.utils.clip_grad_norm(model.parameters(), 10)
             optimizer.step()
             loss += batch_loss.data[0]
             if batch % 100 == 0:
                 print('{}:loss:{}'.format(batch, loss / batch))
 
-            # if batch % opt.eval_iter == 0:
-            #     best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
+            if batch % opt.eval_iter == 0:
+                best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
         best_score, checkpoint_id = eval(opt, model, best_score, checkpoint_id, epoch + 1, batch)
 
 if __name__=='__main__':

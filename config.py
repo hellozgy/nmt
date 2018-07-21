@@ -20,7 +20,7 @@ class Config():
     embeds_size = 512  # 词向量维度
     hidden_size = 1024  # 隐层维度
     max_len = 30  # 句长截断上限
-    label_smooth = 0
+    label_smooth = 0.01
     dropout = 0.
     attn_general = True
     attn_concat = False
