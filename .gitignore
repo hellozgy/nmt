@@ -3,6 +3,9 @@
 **.dat
 **.pyc
 **.sgm
+**.gz
+**.en
+**.zh
 **/__pycache__
 log/
 checkpoints/

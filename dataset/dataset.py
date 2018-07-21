@@ -4,13 +4,13 @@ import numpy as np
 from .Constants import PAD_INDEX, EOS_INDEX
 
 class AIDataset(data.Dataset):
-    def __init__(self, subset, max_len):
+    def __init__(self, subset, max_len, opt):
         '''
         :param subset: train,valid,test
         '''
         self.subset = subset
         self.max_len = max_len
-        self.ens, self.zhs, self.word2index_en, self.word2index_zh = getdata(subset)
+        self.ens, self.zhs, self.word2index_en, self.word2index_zh = getdata(subset, opt)
         self.index2word_en = dict(zip(self.word2index_en.values(), self.word2index_en.keys()))
         self.index2word_zh = dict(zip(self.word2index_zh.values(), self.word2index_zh.keys()))
         self.vocab_size_en = len(self.word2index_en)

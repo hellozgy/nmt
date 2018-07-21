@@ -16,7 +16,7 @@ torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
 def eval(opt, model, best_score, checkpoint_id, epoch, batch):
-    dataset = AIDataset('valid', opt.max_len)
+    dataset = AIDataset('valid', opt.max_len, opt)
     dataloader = data.DataLoader(
         dataset=dataset,
         batch_size=opt.batch_size,
@@ -68,7 +68,7 @@ def train(**kwargs):
     save2path = './checkpoints/{}/'.format(opt.id)
     if  not os.path.exists(save2path): os.system('mkdir {}'.format(save2path))
     assert opt.ngpu >= 0
-    dataset_train = AIDataset('train', opt.max_len)
+    dataset_train = AIDataset('train', opt.max_len, opt)
     opt.input_size = dataset_train.vocab_size_en
     opt.output_size = dataset_train.vocab_size_zh
     print('vocab_en:{} vocab_zh:{}'.format(opt.input_size, opt.output_size))

@@ -88,9 +88,7 @@ class AdaptiveLoss(nn.Module):
         self.criterions = nn.ModuleList()
         
         for i in self.cutoff:
-            self.criterions.append(nn.KLDivLoss())
-            # self.criterions.append(nn.CrossEntropyLoss(size_average=False, ignore_index=Constants.PAD_INDEX))
-
+            self.criterions.append(nn.CrossEntropyLoss(size_average=False, ignore_index=Constants.PAD_INDEX))
             
     def remap_target(self, target): 
         '''
@@ -109,22 +107,6 @@ class AdaptiveLoss(nn.Module):
                 new_target.append(None)
                 
         return new_target
-
-    def label_smooth(self, inputs, targets):
-        label_smooth = 0.1
-
-        for i in range(len(targets)):
-            if inputs[i] is None:continue
-            true_dist = inputs[i].data.clone()
-            true_dist.fill_(label_smooth / (len(true_dist[0])-2))
-            true_dist.scatter_(1, targets[i].data.unsqueeze(1), 1-label_smooth)
-            true_dist[:, Constants.PAD_INDEX] = 0
-            if i == 0:
-                mask = torch.nonzero(targets[i].data==Constants.PAD_INDEX)
-                if len(mask)>0:
-                    true_dist.index_fill_(0, mask.squeeze(), 0.)
-            targets[i]=true_dist
-        return targets
     
     def forward(self, input, target):
         '''
@@ -135,14 +117,14 @@ class AdaptiveLoss(nn.Module):
         '''
         batch_size = input[0].size(0)
         target = self.remap_target(target.data)
-        target = self.label_smooth(input, target)
+        
         output = 0.0
     
         for i in range(len(input)):
             if input[i] is not None:
                 assert(target[i].min() >= 0 and target[i].max() <= input[i].size(1))
                 criterion = self.criterions[i]
-                output += criterion(F.log_softmax(input[i], dim=-1), Variable(target[i]))
+                output += criterion(input[i], Variable(target[i]))
                 
         output /= batch_size
         

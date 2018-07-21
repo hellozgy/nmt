@@ -1,5 +1,16 @@
 
 class Config():
+    base_dir = '.'
+    data_dir = 'data/'
+    src_vocab = 'vocab.en'
+    dst_vocab = 'vocab.zh'
+    src_train = 'train.en'
+    src_dev = 'val.en'
+    src_test = 'val.en'
+    dst_train = 'train.zh'
+    dst_dev = 'val.zh'
+    dst_test= 'val.zh'
+
     ngpu = -1  # 指定gpu
     model = None
     input_size = -1
@@ -44,6 +55,7 @@ class Config():
                 and not k.startswith('show') and k not in set(['ngpu', 'id', 'beam_size', 'alpha', 'beta', 'restore_file'])]
         for key in keys:
             setattr(self, key, getattr(opt, key))
+
 
 
 opt = Config()
