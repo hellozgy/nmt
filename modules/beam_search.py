@@ -130,7 +130,7 @@ class Beam(object):
 
 class GlobalScorer(object):
     # refer to GNMT
-    def __init__(self, src, alpha=1, beta=0):
+    def __init__(self, src, alpha=0.6, beta=0.4):
         self.alpha = alpha
         self.beta = beta
         self.src = src
@@ -140,8 +140,8 @@ class GlobalScorer(object):
 
     def score(self, beam, logprobs, i):
         cov = beam.globalState["coverage"]
-        pen = self.beta * (torch.min(cov.data+self.mask, cov.data.clone().fill_(1.0)).mean(1).log())
-        l_term = (len(beam.nextYs)-1)**self.alpha
+        pen = self.beta * (torch.min(cov.data+self.mask, cov.data.clone().fill_(1.0)).log().sum(1))
+        l_term = ((5 + len(beam.nextYs)-1) ** self.alpha) / ((5 + 1) ** self.alpha)
         return logprobs[i] / l_term + pen[i]
 
     def updateGlobalState(self, beam):

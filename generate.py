@@ -7,7 +7,7 @@ from dataset import AIDataset
 from torch.utils import data
 import sys
 sys.path.append('/users2/hpzhao/gyzhu/nmt/data_valid/tools/')
-from mt_score_main import mybleu
+from data_valid import mybleu
 from dataset import Constants
 from modules import Beam, GlobalScorer
 import ipdb
@@ -15,7 +15,7 @@ import ipdb
 def generate(**kwargs):
     opt.parse(kwargs)
     assert opt.id is not None
-    dataset = AIDataset('valid', opt.max_len)
+    dataset = AIDataset('valid', opt.max_len, opt)
     opt.input_size = dataset.vocab_size_en
     opt.output_size = dataset.vocab_size_zh
     _models = []
@@ -38,7 +38,7 @@ def generate(**kwargs):
         sentence_en = Variable(sentence_en, volatile=True).long().cuda(opt.ngpu)
         predicts = translate_batch(_models, sentence_en, opt.beam_size, opt.generate_max_len)
         for i in range(len(predicts)):
-            sentence = ''.join([dataset.index2word_zh[index] for index in predicts[i]])
+            sentence = ''.join([dataset.index2word_zh[index.cpu().tolist()] for index in predicts[i]])
             fw.write(sentence + '\n')
         fw.flush()
     fw.flush()
@@ -59,8 +59,8 @@ def translate_batch(_models, inputs, beam_size, generate_max_len):
     mask = mask.float().masked_fill_(mask, float('-inf'))
 
     n_remaining_sents = batch_size
-    beam = [Beam(beam_size, ngpu,
-                 global_scorer=GlobalScorer(inputs[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
+    # beam = [Beam(beam_size, ngpu,global_scorer=GlobalScorer(inputs[i*beam_size:(i+1)*beam_size,:])) for i in range(batch_size)]
+    beam = [Beam(beam_size, ngpu, None) for i in range(batch_size)]
 
     length = 0
     for ii in range(generate_max_len):
